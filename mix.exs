@@ -39,8 +39,8 @@ defmodule Breeze.MixProject do
   defp deps do
     [
       {:nimble_parsec, "~> 1.4"},
-      {:termite, "~> 0.3.0"},
-      {:back_breeze, "~> 0.2.1"},
+      {:termite, "~> 0.4.0"},
+      {:back_breeze, github: "gazler/back_breeze"},
       {:phoenix_live_view, "~> 1.0.0"},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false}
     ]
