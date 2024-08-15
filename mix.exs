@@ -39,7 +39,7 @@ defmodule Breeze.MixProject do
   defp deps do
     [
       {:termite, "~> 0.4.0"},
-      {:back_breeze, "~> 0.2.2"},
+      {:back_breeze, path: "../back_breeze"},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false}
     ]
   end

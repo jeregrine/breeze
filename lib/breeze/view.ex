@@ -309,4 +309,8 @@ defmodule Breeze.View do
   def assign(term, values) do
     %{term | assigns: Map.merge(term.assigns, Map.new(values))}
   end
+
+  def focus(term, value) do
+    %{term | focused: value}
+  end
 end

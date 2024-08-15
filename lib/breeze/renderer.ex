@@ -14,7 +14,11 @@ defmodule Breeze.Renderer do
       |> Breeze.Template.render_to_tree(assigns)
 
     {acc, box} = build_from_tree_nodes(root_children, opts)
-    {acc, BackBreeze.Box.render(box, terminal: terminal_from_opts(opts))}
+
+    %{box: box, dimensions: dimensions} =
+      BackBreeze.Box.render_with_dimensions(box)
+
+    {Map.put(acc, :dimensions, dimensions), box}
   end
 
   defp build_from_tree_nodes(children, opts) do
@@ -26,16 +30,6 @@ defmodule Breeze.Renderer do
     ids = Enum.reverse(acc.ids)
     focusables = Enum.reverse(acc.focusables) |> then(&Enum.filter(ids, fn id -> id in &1 end))
     {%{acc | ids: ids, focusables: focusables}, box}
-  end
-
-  defp terminal_from_opts(opts) do
-    case Keyword.get(opts, :terminal) do
-      %Termite.Terminal{} = terminal ->
-        terminal
-
-      _ ->
-        %Termite.Terminal{size: %{width: 80, height: 24}}
-    end
   end
 
   defp build_tree(
@@ -132,16 +126,19 @@ defmodule Breeze.Renderer do
 
     implicit_state = Keyword.get(opts, :implicit_state, %{})
     implicit_id = Keyword.get(flags, :implicit_id)
+    id = implicit_id || Keyword.get(flags, :id)
 
     {implicit_mod, implicit} =
-      case implicit_id && get_in(implicit_state, [implicit_id]) do
+      case id && get_in(implicit_state, [id]) do
         nil -> {nil, nil}
         {mod, state} -> {mod, state}
       end
 
+    type = if id == Keyword.get(flags, :id), do: :root, else: :child
+
     style_opts =
       if implicit do
-        modifiers = implicit_mod.handle_modifiers(flags, implicit)
+        modifiers = implicit_mod.handle_modifiers(type, flags, implicit)
         style_opts ++ modifiers
       else
         style_opts
@@ -161,6 +158,12 @@ defmodule Breeze.Renderer do
   end
 
   defp string_to_styles(str, opts) do
+    str =
+      case Keyword.get_values(opts, :style) do
+        [] -> str
+        other -> str <> " " <> Enum.join(other, " ")
+      end
+
     map =
       String.split(str, " ")
       |> Enum.map(&String.split(&1, ":"))
@@ -191,8 +194,15 @@ defmodule Breeze.Renderer do
   defp apply_style("overflow-" <> overflow, acc),
     do: Map.put(acc, :overflow, String.to_existing_atom(overflow))
 
-  defp apply_style("offset-top-" <> num, acc),
-    do: Map.put(acc, :scroll, {String.to_integer(num), 0})
+  defp apply_style("offset-top-" <> num, acc) do
+    {_, left} = Map.get(acc, :scroll, {0, 0})
+    Map.put(acc, :scroll, {String.to_integer(num), left})
+  end
+
+  defp apply_style("offset-left-" <> num, acc) do
+    {top, _} = Map.get(acc, :scroll, {0, 0})
+    Map.put(acc, :scroll, {top, String.to_integer(num)})
+  end
 
   defp apply_style("absolute", acc), do: Map.put(acc, :position, :absolute)
   defp apply_style("left-" <> num, acc), do: Map.put(acc, :left, String.to_integer(num))
