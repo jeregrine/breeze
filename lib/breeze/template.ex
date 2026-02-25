@@ -1,5 +1,13 @@
 defmodule Breeze.Template do
-  @moduledoc false
+  @moduledoc """
+  Internal compiler/runtime backing Breeze's `~H` sigil.
+
+  This module reimplements a Breeze-focused subset of HEEx concepts.
+  Relevant Phoenix LiveView prior art:
+
+  * https://github.com/phoenixframework/phoenix_live_view/blob/main/lib/phoenix_component.ex
+  * https://github.com/phoenixframework/phoenix_live_view/blob/main/lib/phoenix_live_view/tag_engine.ex
+  """
 
   defstruct [:nodes, :env]
 

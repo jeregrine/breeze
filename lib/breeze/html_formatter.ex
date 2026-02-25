@@ -11,6 +11,12 @@ defmodule Breeze.HTMLFormatter do
         plugins: [Breeze.HTMLFormatter],
         inputs: ["{mix,.formatter}.exs", "{config,lib,test}/**/*.{ex,exs}"]
       ]
+
+  ## Prior art
+
+  This module is inspired by Phoenix LiveView's HEEx formatter:
+
+  * https://github.com/phoenixframework/phoenix_live_view/blob/main/lib/phoenix_live_view/html_formatter.ex
   """
 
   @behaviour Mix.Tasks.Format

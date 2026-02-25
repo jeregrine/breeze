@@ -8,6 +8,14 @@ defmodule Breeze.View do
   >
   > This API is unstable and very likely to change.
 
+  ## Prior art
+
+  Breeze's template/component ergonomics are inspired by Phoenix LiveView.
+  Relevant upstream modules:
+
+  * https://github.com/phoenixframework/phoenix_live_view/blob/main/lib/phoenix_component.ex
+  * https://github.com/phoenixframework/phoenix_live_view/blob/main/lib/phoenix_live_view/tag_engine.ex
+
   ## Usage
 
   The module can be used by including `use Breeze.View`:
