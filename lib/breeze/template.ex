@@ -33,9 +33,30 @@ defmodule Breeze.Template do
   end
 
   def render_to_string(data, _assigns) when is_binary(data), do: data
-  def render_to_string(data, _assigns) when is_list(data), do: IO.iodata_to_binary(data)
+
+  def render_to_string(data, _assigns) when is_list(data) do
+    if tree_nodes?(data), do: tree_nodes_to_string(data), else: IO.iodata_to_binary(data)
+  end
+
   def render_to_string(nil, _assigns), do: ""
   def render_to_string(other, _assigns), do: to_string(other)
+
+  def render_to_tree(%__MODULE__{nodes: nodes, env: env}, assigns) do
+    ctx = %{assigns: normalize_assigns(assigns), vars: %{}, env: env}
+    render_nodes_to_tree(nodes, ctx)
+  end
+
+  def render_to_tree(data, _assigns) when is_binary(data) do
+    if data == "", do: [], else: [{:text, data}]
+  end
+
+  def render_to_tree(data, _assigns) when is_list(data) do
+    data = IO.iodata_to_binary(data)
+    if data == "", do: [], else: [{:text, data}]
+  end
+
+  def render_to_tree(nil, _assigns), do: []
+  def render_to_tree(other, _assigns), do: [{:text, to_string(other)}]
 
   def component_names(%__MODULE__{nodes: nodes}), do: component_names(nodes)
 
@@ -63,6 +84,10 @@ defmodule Breeze.Template do
     Enum.map_join(nodes, "", &render_node(&1, ctx))
   end
 
+  defp render_nodes_to_tree(nodes, ctx) do
+    Enum.flat_map(nodes, &render_node_to_tree(&1, ctx))
+  end
+
   defp render_node({:text, segments}, ctx) do
     Enum.map_join(segments, "", fn
       {:expr, expr} -> expr |> eval_expr(ctx) |> normalize_output()
@@ -83,6 +108,33 @@ defmodule Breeze.Template do
         render_element(name, attrs, children, iteration_ctx)
       else
         ""
+      end
+    end)
+  end
+
+  defp render_node_to_tree({:text, segments}, ctx) do
+    text =
+      Enum.map_join(segments, "", fn
+        {:expr, expr} -> expr |> eval_expr(ctx) |> normalize_output()
+        text when is_binary(text) -> text
+      end)
+
+    if text == "", do: [], else: [{:text, text}]
+  end
+
+  defp render_node_to_tree({:expr, expr}, ctx) do
+    expr
+    |> eval_expr(ctx)
+    |> normalize_tree_output()
+  end
+
+  defp render_node_to_tree({:element, name, attrs, directives, children}, ctx) do
+    expand_for(directives[:for], ctx)
+    |> Enum.flat_map(fn iteration_ctx ->
+      if render_if?(directives[:if], iteration_ctx) do
+        render_element_to_tree(name, attrs, children, iteration_ctx)
+      else
+        []
       end
     end)
   end
@@ -116,6 +168,57 @@ defmodule Breeze.Template do
     closing = ["</", name, ">"]
 
     IO.iodata_to_binary([opening, content, closing])
+  end
+
+  defp render_element_to_tree("." <> component, attrs, children, ctx) do
+    module = ctx.env.module
+    fun = String.to_atom(component)
+
+    attrs = eval_component_attrs(attrs, ctx)
+
+    rest = Enum.filter(attrs, fn {key, _value} -> global_attr?(key) end)
+
+    assigns =
+      attrs
+      |> Map.new()
+      |> maybe_put_rest(rest)
+      |> Map.merge(build_slots(children, ctx))
+
+    module
+    |> invoke_component(fun, assigns)
+    |> component_result_to_tree(assigns)
+  end
+
+  defp render_element_to_tree(":" <> _slot_name, _attrs, _children, _ctx), do: []
+
+  defp render_element_to_tree(name, attrs, children, ctx) do
+    attrs = eval_html_attrs(attrs, ctx)
+    children = render_nodes_to_tree(children, ctx)
+    [{:element, name, attrs, children}]
+  end
+
+  defp component_result_to_tree(result, assigns) do
+    case result do
+      %__MODULE__{} = template ->
+        render_to_tree(template, assigns)
+
+      data when is_binary(data) ->
+        if data == "", do: [], else: [{:text, data}]
+
+      data when is_list(data) ->
+        if tree_nodes?(data) do
+          data
+        else
+          data = IO.iodata_to_binary(data)
+          if data == "", do: [], else: [{:text, data}]
+        end
+
+      nil ->
+        []
+
+      other ->
+        [{:text, to_string(other)}]
+    end
   end
 
   defp invoke_component(module, component, assigns) do
@@ -161,7 +264,7 @@ defmodule Breeze.Template do
     render_fun = fn args ->
       args = normalize_assigns(args)
       slot_ctx = %{ctx | vars: Map.merge(ctx.vars, args)}
-      render_nodes(children, slot_ctx)
+      render_nodes_to_tree(children, slot_ctx)
     end
 
     Map.put(slot_attrs, :__breeze_slot__, render_fun)
@@ -319,8 +422,53 @@ defmodule Breeze.Template do
 
   defp normalize_output(nil), do: ""
   defp normalize_output(data) when is_binary(data), do: data
-  defp normalize_output(data) when is_list(data), do: IO.iodata_to_binary(data)
+
+  defp normalize_output(data) when is_list(data) do
+    if tree_nodes?(data) do
+      tree_nodes_to_string(data)
+    else
+      IO.iodata_to_binary(data)
+    end
+  end
+
   defp normalize_output(data), do: to_string(data)
+
+  defp normalize_tree_output(nil), do: []
+  defp normalize_tree_output(data) when is_binary(data), do: [{:text, data}]
+
+  defp normalize_tree_output(data) when is_list(data) do
+    cond do
+      tree_nodes?(data) -> data
+      true -> [{:text, IO.iodata_to_binary(data)}]
+    end
+  end
+
+  defp normalize_tree_output(%__MODULE__{} = template), do: render_to_tree(template, %{})
+  defp normalize_tree_output(other), do: [{:text, to_string(other)}]
+
+  defp tree_nodes?(value) when is_list(value) do
+    Enum.all?(value, fn
+      {:text, _} -> true
+      {:element, _name, _attrs, _children} -> true
+      _ -> false
+    end)
+  end
+
+  defp tree_nodes?(_), do: false
+
+  defp tree_nodes_to_string(nodes) do
+    Enum.map_join(nodes, "", fn
+      {:text, text} ->
+        text
+
+      {:element, name, attrs, children} ->
+        "<" <>
+          name <>
+          serialize_attrs(attrs) <>
+          ">" <>
+          tree_nodes_to_string(children) <> "</" <> name <> ">"
+    end)
+  end
 
   defp normalize_assigns(assigns) when is_map(assigns), do: assigns
   defp normalize_assigns(assigns) when is_list(assigns), do: Map.new(assigns)

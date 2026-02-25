@@ -46,7 +46,7 @@ defmodule Breeze.RendererTest do
     test "converts a string to boxes" do
       data =
         Example.render(%{name: "world"})
-        |> Breeze.Template.render_to_string(%{name: "world"})
+        |> Breeze.Template.render_to_tree(%{name: "world"})
 
       {_, boxes} = Renderer.parse(data)
 

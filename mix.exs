@@ -38,7 +38,6 @@ defmodule Breeze.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:nimble_parsec, "~> 1.4"},
       {:termite, "~> 0.3.0"},
       {:back_breeze, "~> 0.2.1"},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false}

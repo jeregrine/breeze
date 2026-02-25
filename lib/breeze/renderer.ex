@@ -2,60 +2,6 @@ defmodule Breeze.Renderer do
   @moduledoc false
 
   alias BackBreeze.Box
-  import NimbleParsec
-
-  defparsecp(:parse_nodes, parsec(:node) |> eos())
-
-  tag = ascii_string([?a..?z, ?_, ?A..?Z], min: 1)
-  text = utf8_string([not: ?<], min: 1)
-
-  attribute =
-    ignore(string(" "))
-    |> ascii_string([?a..?z, ?-], min: 1)
-    |> ignore(string("="))
-    |> ignore(string(~s(")))
-    |> ascii_string([not: ?"], min: 1)
-    |> ignore(string(~s(")))
-    |> tag(:attribute)
-
-  boolean_attribute =
-    ignore(string(" "))
-    |> ascii_string([?a..?z], min: 1)
-    |> tag(:attribute_bool)
-
-  opening_tag =
-    ignore(string("<"))
-    |> concat(tag)
-    |> repeat(
-      choice([
-        attribute,
-        boolean_attribute
-      ])
-    )
-    |> ignore(string(">"))
-
-  closing_tag = ignore(string("</")) |> concat(tag) |> ignore(string(">"))
-
-  padding = string("\n") |> repeat(choice([ascii_char([?\s]), string("\n")]))
-
-  defcombinatorp(
-    :node,
-    opening_tag
-    |> ignore(optional(padding))
-    |> repeat(lookahead_not(string("</")) |> choice([parsec(:node), text]))
-    |> wrap()
-    |> concat(closing_tag)
-    |> ignore(optional(padding))
-    |> post_traverse(:match_and_emit_tag)
-  )
-
-  defp match_and_emit_tag(rest, [tag, [tag, text]], context, _line, _offset) do
-    {rest, [{String.to_atom(tag), [], [text]}], context}
-  end
-
-  defp match_and_emit_tag(rest, [tag, [tag | nodes]], context, _line, _offset) do
-    {rest, [{String.to_atom(tag), [], nodes}], context}
-  end
 
   def render_to_string(mod, assigns, opts \\ []) do
     {_, %{content: content}} = render(mod, assigns, opts)
@@ -65,7 +11,7 @@ defmodule Breeze.Renderer do
   def render(mod, assigns, opts \\ []) do
     {acc, box} =
       mod.render(assigns)
-      |> Breeze.Template.render_to_string(assigns)
+      |> Breeze.Template.render_to_tree(assigns)
       |> parse(opts)
 
     {acc, BackBreeze.Box.render(box, terminal: terminal_from_opts(opts))}
@@ -81,8 +27,10 @@ defmodule Breeze.Renderer do
     end
   end
 
-  def parse(data, opts \\ []) do
-    {:ok, [{:box, _, children}], "", _, _, _} = parse_nodes(data)
+  def parse(data, opts \\ [])
+
+  def parse(data, opts) when is_list(data) do
+    children = root_children(data)
 
     {acc, box} =
       build_tree(
@@ -103,6 +51,66 @@ defmodule Breeze.Renderer do
 
     {%{acc | ids: ids, focusables: focusables}, box}
   end
+
+  def parse(_data, _opts) do
+    raise ArgumentError,
+          "Renderer.parse/2 expects a rendered Breeze template tree (use Breeze.Template.render_to_tree/2)"
+  end
+
+  defp root_children(nodes) do
+    nodes =
+      Enum.reject(nodes, fn
+        {:text, text} -> String.trim(text) == ""
+        _ -> false
+      end)
+
+    case nodes do
+      [{:element, "box", attrs, children}] ->
+        attrs_to_legacy_nodes(attrs) ++ children_to_legacy_nodes(children)
+
+      [{:element, name, _attrs, _children}] ->
+        raise ArgumentError, "expected root <box>, got <#{name}>"
+
+      [] ->
+        raise ArgumentError, "expected root <box>, got empty output"
+
+      _ ->
+        raise ArgumentError, "expected a single root <box>"
+    end
+  end
+
+  defp children_to_legacy_nodes(nodes) do
+    Enum.flat_map(nodes, fn
+      {:text, text} when text == "" ->
+        []
+
+      {:text, text} ->
+        [text]
+
+      {:element, "box", attrs, children} ->
+        [{:box, [], attrs_to_legacy_nodes(attrs) ++ children_to_legacy_nodes(children)}]
+
+      {:element, name, _attrs, _children} ->
+        raise ArgumentError, "unsupported rendered element <#{name}>; only <box> is supported"
+    end)
+  end
+
+  defp attrs_to_legacy_nodes(attrs) do
+    Enum.flat_map(attrs, fn
+      {name, true} ->
+        [{:attribute_bool, [to_string(name)]}]
+
+      {_name, value} when value in [false, nil] ->
+        []
+
+      {name, value} ->
+        [{:attribute, [to_string(name), attr_value_to_string(value)]}]
+    end)
+  end
+
+  defp attr_value_to_string(value) when is_binary(value), do: value
+  defp attr_value_to_string(value) when is_atom(value), do: Atom.to_string(value)
+  defp attr_value_to_string(value), do: to_string(value)
 
   defp build_tree(
          [{:attribute, ["style", style]} | rest],
@@ -159,7 +167,8 @@ defmodule Breeze.Renderer do
   defp build_tree([content | rest], box, children, style, flags, acc, opts)
        when is_binary(content) do
     # TODO: move the String.trim_trailing into the parser
-    box = %{box | content: String.trim_trailing(content, "\n  ")}
+    content = String.trim_trailing(content, "\n  ")
+    box = %{box | content: box.content <> content}
     build_tree(rest, box, children, style, flags, acc, opts)
   end
 
