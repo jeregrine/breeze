@@ -50,6 +50,18 @@ def deps do
 end
 ```
 
+## Formatter
+
+Breeze ships with a `mix format` plugin for `~H` templates:
+
+```elixir
+# .formatter.exs
+[
+  plugins: [Breeze.HTMLFormatter],
+  inputs: ["{mix,.formatter}.exs", "{config,lib,test}/**/*.{ex,exs}"]
+]
+```
+
 ## Examples
 
 ```elixir

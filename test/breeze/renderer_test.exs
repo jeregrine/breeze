@@ -22,9 +22,7 @@ defmodule Breeze.RendererTest do
     defp panel(assigns) do
       ~H"""
       <box style="border">
-        <box :if={assigns[:title]} style="absolute left-1 top-0">
-          <%= render_slot(@title) %>
-        </box>
+        <box :if={assigns[:title]} style="absolute left-1 top-0"><%= render_slot(@title) %></box>
         <%= render_slot(@inner_block) %>
       </box>
       """
