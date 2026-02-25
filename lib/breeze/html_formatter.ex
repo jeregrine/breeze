@@ -41,9 +41,9 @@ defmodule Breeze.HTMLFormatter do
         |> parse_template(opts)
         |> Map.fetch!(:nodes)
         |> format_nodes(0, line_length)
+        |> normalize_blank_lines()
+        |> trim_blank_edges()
         |> Enum.join("\n")
-        |> String.replace(~r/\n{3,}/, "\n\n")
-        |> String.trim()
 
       newline =
         if match?(<<_>>, opts[:opening_delimiter] || "") or formatted in ["", []],
@@ -123,7 +123,9 @@ defmodule Breeze.HTMLFormatter do
     end
   end
 
-  defp format_node(_node, _indent, _line_length), do: []
+  defp format_node(node, _indent, _line_length) do
+    raise ArgumentError, "unsupported template node in Breeze.HTMLFormatter: #{inspect(node)}"
+  end
 
   defp inline_children(children) do
     if Enum.all?(children, &simple_inline_node?/1) do
@@ -197,6 +199,26 @@ defmodule Breeze.HTMLFormatter do
 
   defp format_attr({:spread, expr}) do
     "{" <> expr_to_string(expr) <> "}"
+  end
+
+  defp normalize_blank_lines(lines) do
+    {lines, _last_blank?} =
+      Enum.reduce(lines, {[], false}, fn line, {acc, last_blank?} ->
+        blank? = String.trim(line) == ""
+
+        cond do
+          blank? and last_blank? ->
+            {acc, true}
+
+          blank? ->
+            {["" | acc], true}
+
+          true ->
+            {[line | acc], false}
+        end
+      end)
+
+    Enum.reverse(lines)
   end
 
   defp trim_blank_edges(lines) do

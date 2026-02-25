@@ -85,6 +85,28 @@ defmodule Breeze.HTMLFormatterTest do
              """
   end
 
+  test "normalizes blank lines deterministically" do
+    source = "\n\n<box><box>a</box></box>\n\n\n"
+
+    formatted =
+      HTMLFormatter.format(source,
+        sigil: :H,
+        opening_delimiter: "\"\"\""
+      )
+
+    assert formatted ==
+             """
+             <box>
+               <box>a</box>
+             </box>
+             """
+
+    assert HTMLFormatter.format(formatted,
+             sigil: :H,
+             opening_delimiter: "\"\"\""
+           ) == formatted
+  end
+
   test "supports ~H\"...\" noformat modifier" do
     source = "<box><box>{@name}</box></box>"
     assert HTMLFormatter.format(source, sigil: :H, modifiers: ~c"noformat") == source
