@@ -1,6 +1,6 @@
 # Breeze
 
-An experimental TUI library based on LiveView without using 3rd party NIFs.
+An experimental TUI library with a LiveView-inspired API without using 3rd party NIFs.
 
 Breeze is built on top of [Termite](https://github.com/Gazler/termite) and [BackBreeze](https://github.com/Gazler/back_breeze)
 
@@ -23,7 +23,7 @@ I mainly built it for writing snake, which is in the examples directory.
 ## Missing features
 
  * behaviours for all of the modules that expect callbacks
- * Whitespace is a bit janky in the Heex
+ * Whitespace is a bit janky in the template engine
  * A decent way to handle logging
  * A decent way to handle errors/exceptions
  * viewports/sizing calculations allowing for scrollable regions
@@ -33,11 +33,10 @@ I mainly built it for writing snake, which is in the examples directory.
 
 ## Does this actually use LiveView?
 
-Breeze *sort of* uses LiveView. LiveView is a required dependency for now as Heex is used to handle
-rendering. Currently the way LiveView is used is very inefficient as we have to do multiple passes
-to convert the Heex to BackBreeze boxes for rendering. If this experiment is successful, it is
-likely that the Heex sections of LiveView will be ported to this project and modified in
-a way that makes sense.
+No. Breeze now ships with its own `~H` sigil and template runtime.
+
+The syntax is intentionally similar to HEEx (`@assigns`, function components, slots,
+`:for`, `:if`), but it does not depend on `phoenix_live_view`.
 
 ## Installation
 
