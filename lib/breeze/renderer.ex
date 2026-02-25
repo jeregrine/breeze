@@ -64,11 +64,21 @@ defmodule Breeze.Renderer do
 
   def render(mod, assigns, opts \\ []) do
     {acc, box} =
-      Phoenix.HTML.Safe.to_iodata(mod.render(assigns))
-      |> IO.iodata_to_binary()
+      mod.render(assigns)
+      |> Breeze.Template.render_to_string(assigns)
       |> parse(opts)
 
-    {acc, BackBreeze.Box.render(box)}
+    {acc, BackBreeze.Box.render(box, terminal: terminal_from_opts(opts))}
+  end
+
+  defp terminal_from_opts(opts) do
+    case Keyword.get(opts, :terminal) do
+      %Termite.Terminal{} = terminal ->
+        terminal
+
+      _ ->
+        %Termite.Terminal{size: %{width: 80, height: 24}}
+    end
   end
 
   def parse(data, opts \\ []) do

@@ -47,8 +47,8 @@ defmodule Breeze.RendererTest do
 
     test "converts a string to boxes" do
       data =
-        Phoenix.HTML.Safe.to_iodata(Example.render(%{name: "world"}))
-        |> IO.iodata_to_binary()
+        Example.render(%{name: "world"})
+        |> Breeze.Template.render_to_string(%{name: "world"})
 
       {_, boxes} = Renderer.parse(data)
 
