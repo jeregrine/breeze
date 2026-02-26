@@ -312,10 +312,22 @@ defmodule Breeze.Server do
       end
 
     implicit_state =
-      cond do
-        function_exported?(mod, :init, 3) -> mod.init(items, root_attrs, last_state)
-        function_exported?(mod, :init, 2) -> mod.init(items, last_state)
-        true -> raise ArgumentError, "implicit #{inspect(mod)} must implement init/2 or init/3"
+      case Code.ensure_loaded(mod) do
+        {:module, _module} ->
+          cond do
+            function_exported?(mod, :init, 3) ->
+              mod.init(items, root_attrs, last_state)
+
+            function_exported?(mod, :init, 2) ->
+              mod.init(items, last_state)
+
+            true ->
+              raise ArgumentError, "implicit #{inspect(mod)} must implement init/2 or init/3"
+          end
+
+        {:error, reason} ->
+          raise ArgumentError,
+                "implicit #{inspect(mod)} could not be loaded (#{inspect(reason)})"
       end
 
     Map.put(acc, id, {mod, implicit_state})
