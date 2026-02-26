@@ -40,7 +40,7 @@ defmodule ListViewDemo do
       list-loop="true"
       list-scroll-padding="1"
       focusable
-      style="border width-24 height-8 overflow-hidden focus:border-3"
+      style="border width-auto height-8 overflow-scroll focus:border-3"
       {@rest}
     >
       <box

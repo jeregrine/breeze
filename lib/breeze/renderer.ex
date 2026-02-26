@@ -245,6 +245,9 @@ defmodule Breeze.Renderer do
   defp apply_style("reverse", acc), do: Map.put(acc, :reverse, true)
   defp apply_style("inline", acc), do: Map.put(acc, :display, :inline)
 
+  defp apply_style("overflow-scroll", acc),
+    do: Map.merge(acc, %{overflow: :hidden, scrollbar: true})
+
   defp apply_style("overflow-" <> overflow, acc),
     do: Map.put(acc, :overflow, String.to_existing_atom(overflow))
 

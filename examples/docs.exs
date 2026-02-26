@@ -97,7 +97,7 @@ defmodule Breeze.List do
   def handle_event(_, _, state), do: {:noreply, state}
 
   def handle_modifiers(:child, flags, state) do
-    overflow = if state.wrap, do: [], else: [style: "overflow-hidden"]
+    overflow = if state.wrap, do: [], else: [style: "overflow-scroll"]
 
     if state.selected == Keyword.get(flags, :value) do
       [selected: true] ++ overflow
@@ -213,8 +213,8 @@ defmodule Docs do
     ~H"""
     <box
       focusable
-      style={"border height-screen overflow-hidden width-#{@width} focus:border-3"}
-      implicit={Breeze.List}
+      style={"border height-screen overflow-scroll width-#{@width} focus:border-3"}
+      implicit={Breeze.ListView}
       id={@id}
       list-width={@width}
       {@rest}
