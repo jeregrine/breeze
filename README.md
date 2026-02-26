@@ -19,6 +19,8 @@ I mainly built it for writing snake, which is in the examples directory.
   * components
   * attributes
   * slots
+ * Scrollable viewports via implicit modifiers (`scroll_y`, `scroll_x`, `scroll`)
+ * Built-in `Breeze.ListView` implicit for keyboard-driven list navigation
 
 ## Missing features
 
@@ -26,8 +28,7 @@ I mainly built it for writing snake, which is in the examples directory.
  * Whitespace is a bit janky in the Heex
  * A decent way to handle logging
  * A decent way to handle errors/exceptions
- * viewports/sizing calculations allowing for scrollable regions
-  * this requires modifications to how BackBreeze renders boxes
+ * scrollbars for viewport/list components
  * A component library
  * handle colour variants
 
@@ -82,5 +83,20 @@ receive do
 end
 
 ```
+
+## Built-in ListView implicit
+
+For focusable, keyboard-driven lists with viewport scrolling, use `Breeze.ListView`:
+
+```elixir
+<box id="languages" implicit={Breeze.ListView} br-change="change" focusable style="border width-24 height-8 overflow-hidden">
+  <box :for={item <- @items} value={item.value} style="selected:bg-4 selected:text-7">
+    <%= item.label %>
+  </box>
+</box>
+```
+
+`Breeze.ListView` emits `{value, index, offset}` through `br-change` and applies
+`selected: true` to the active child.
 
 More examples are available in the examples directory.

@@ -1,15 +1,16 @@
 defmodule Breeze.List do
-  def init(children, last_state) do
+  def init(children, root_attrs, last_state) do
     values =
       children
       |> Enum.filter(&Map.has_key?(&1, :value))
-      |> Enum.map(&(&1.value))
+      |> Enum.map(& &1.value)
 
     width =
-      children
-      |> Enum.find_value(fn c -> Map.get(c, :"list-width") end)
+      root_attrs
+      |> Map.get(:"list-width")
       |> then(fn
         nil -> last_state[:width] || 32
+        w when is_integer(w) -> w
         w -> String.to_integer(w)
       end)
 
@@ -105,8 +106,8 @@ defmodule Breeze.List do
     end
   end
 
-  def handle_modifiers(:root, flags, state) do
-    [style: "offset-top-#{state.offset}"]
+  def handle_modifiers(:root, _flags, state) do
+    [scroll_y: state.offset]
   end
 
   defp inner_width(width), do: width
@@ -210,14 +211,20 @@ defmodule Docs do
 
   def list(assigns) do
     ~H"""
-    <box focusable style={"border height-screen overflow-hidden width-#{@width} focus:border-3"} implicit={Breeze.List} id={@id} {@rest}>
-        <box style="absolute left-2 top-0"><%= @index + 1 %>/<%= @total %> (Offset: <%= @offset %>)</box>
-        <box
-          :for={item <- @item}
-          value={item.value}
-          list-width={@width}
-          style={"selected:bg-24 selected:text-0 focus:selected:text-7 focus:selected:bg-4 width-#{@width}"}
-        ><%= render_slot(item, %{}) %></box>
+    <box
+      focusable
+      style={"border height-screen overflow-hidden width-#{@width} focus:border-3"}
+      implicit={Breeze.List}
+      id={@id}
+      list-width={@width}
+      {@rest}
+    >
+      <box style="absolute left-2 top-0"><%= @index + 1 %>/<%= @total %> (Offset: <%= @offset %>)</box>
+      <box
+        :for={item <- @item}
+        value={item.value}
+        style={"selected:bg-24 selected:text-0 focus:selected:text-7 focus:selected:bg-4 width-#{@width}"}
+      ><%= render_slot(item, %{}) %></box>
     </box>
     """
   end

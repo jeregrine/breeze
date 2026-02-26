@@ -1,15 +1,16 @@
-defmodule Breeze.Viewport do
+defmodule DemoViewport do
   def init(_children, last_state) do
     %{offset: last_state[:offset] || 0}
   end
 
   def handle_event(_, %{"key" => "ArrowDown", "element" => element}, %{offset: offset} = state) do
-    offset = min(offset + 1, element.content_height - element.height - 1)
+    offset = Breeze.Viewport.clamp_scroll_y(offset + 1, element)
     {:noreply, %{state | offset: offset}}
   end
 
-  def handle_event(_, %{"key" => "ArrowUp"}, %{offset: offset} = state) do
-    {:noreply, %{state | offset: max(offset - 1, 0)}}
+  def handle_event(_, %{"key" => "ArrowUp", "element" => element}, %{offset: offset} = state) do
+    offset = Breeze.Viewport.clamp_scroll_y(offset - 1, element)
+    {:noreply, %{state | offset: offset}}
   end
 
   def handle_event(_, _, state) do
@@ -17,12 +18,10 @@ defmodule Breeze.Viewport do
   end
 
   def handle_modifiers(:root, _flags, state) do
-    if state.offset > 0 do
-      [style: "offset-top-#{state.offset}"]
-    else
-      []
-    end
+    [scroll_y: state.offset]
   end
+
+  def handle_modifiers(:child, _flags, _state), do: []
 end
 
 
@@ -53,7 +52,7 @@ defmodule Scroll do
 
   def viewport(assigns) do
     ~H"""
-    <box style={"width-15 height-#{6 + @id} overflow-hidden border focus:border-3"} id={"content-#{@id}"} implicit={Breeze.Viewport} focusable><%= render_slot(@inner_block) %></box>
+    <box style={"width-15 height-#{6 + @id} overflow-hidden border focus:border-3"} id={"content-#{@id}"} implicit={DemoViewport} focusable><%= render_slot(@inner_block) %></box>
     """
   end
 
