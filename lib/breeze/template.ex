@@ -598,7 +598,9 @@ defmodule Breeze.Template do
 
   defp build_attribute(":for", {:dynamic, expr}, env) do
     {pattern, enumerable} = split_for_expression(expr)
-    {:directive, :for, {pattern, compile_for_pattern(pattern, env), compile_expr(enumerable, env)}}
+
+    {:directive, :for,
+     {pattern, compile_for_pattern(pattern, env), compile_expr(enumerable, env)}}
   end
 
   defp build_attribute(":if", _other, _env) do

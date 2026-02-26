@@ -19,8 +19,7 @@ defmodule ListViewDemo do
         <:item value="gleam">Gleam</:item>
         <:item value="haskell">Haskell</:item>
       </.list>
-
-      <box style="border width-24" :if={@selected}>Selected: <%= @selected %></box>
+      <box :if={@selected} style="border width-24">Selected: <%= @selected %></box>
     </box>
     """
   end
@@ -40,14 +39,12 @@ defmodule ListViewDemo do
       list-loop="true"
       list-scroll-padding="1"
       focusable
-      style="border width-auto height-8 overflow-scroll focus:border-3"
+      style="border width-24 height-8 overflow-scroll focus:border-3"
       {@rest}
     >
-      <box
-        :for={item <- @item}
-        value={item.value}
-        style="selected:bg-4 selected:text-7 width-24"
-      ><%= render_slot(item, %{}) %></box>
+      <box :for={item <- @item} value={item.value} style="selected:bg-4 selected:text-7 width-24">
+        <%= render_slot(item, %{}) %>
+      </box>
     </box>
     """
   end

@@ -22,7 +22,8 @@ defmodule Breeze.ListView do
           selected_index: non_neg_integer() | nil,
           offset: non_neg_integer(),
           loop: boolean(),
-          scroll_padding: non_neg_integer()
+          scroll_padding: non_neg_integer(),
+          width: non_neg_integer()
         }
 
   @spec init(list(map()), map()) :: state()
@@ -40,6 +41,8 @@ defmodule Breeze.ListView do
     scroll_padding =
       int_option(root_attrs, :"list-scroll-padding", Map.get(last_state, :scroll_padding, 0))
 
+    width = int_option(root_attrs, :"list-width", Map.get(last_state, :width, 0))
+
     selected_index =
       values
       |> pick_selected_index(last_state, root_attrs)
@@ -53,7 +56,8 @@ defmodule Breeze.ListView do
       selected_index: selected_index,
       offset: normalize_int(Map.get(last_state, :offset, 0)),
       loop: loop,
-      scroll_padding: scroll_padding
+      scroll_padding: scroll_padding,
+      width: width
     }
   end
 
@@ -89,7 +93,8 @@ defmodule Breeze.ListView do
   def handle_event(_, %{"key" => "PageDown", "element" => element}, state) do
     viewport = Viewport.from_dimensions(element)
     jump = max(viewport.viewport_height - 1, 1)
-    index = (state.selected_index || 0) + jump
+    current_row = rows_before(state.values, state.selected_index || 0, state.width)
+    index = item_index_at_row(state.values, current_row + jump, state.width)
 
     state
     |> set_selection(index, element)
@@ -99,7 +104,8 @@ defmodule Breeze.ListView do
   def handle_event(_, %{"key" => "PageUp", "element" => element}, state) do
     viewport = Viewport.from_dimensions(element)
     jump = max(viewport.viewport_height - 1, 1)
-    index = (state.selected_index || 0) - jump
+    current_row = rows_before(state.values, state.selected_index || 0, state.width)
+    index = item_index_at_row(state.values, max(current_row - jump, 0), state.width)
 
     state
     |> set_selection(index, element)
@@ -138,12 +144,9 @@ defmodule Breeze.ListView do
 
     offset =
       if index do
-        Viewport.ensure_row_visible(
-          state.offset,
-          index,
-          viewport,
-          padding: state.scroll_padding
-        )
+        first = rows_before(state.values, index, state.width)
+        last = first + item_rows(Enum.at(state.values, index), state.width) - 1
+        Viewport.ensure_range_visible(state.offset, first, last, viewport, padding: state.scroll_padding)
       else
         Viewport.clamp_scroll_y(state.offset, viewport)
       end
@@ -189,8 +192,28 @@ defmodule Breeze.ListView do
         Enum.find_index(values, &(&1 == selected))
 
       true ->
-        int_option(root_attrs, :"list-initial-index", 0)
+        case Map.fetch(root_attrs, :"list-initial-index") do
+          {:ok, value} -> normalize_int(value)
+          :error -> nil
+        end
     end
+  end
+
+  defp item_rows(_value, 0), do: 1
+  defp item_rows(value, width), do: max(1, div(String.length(to_string(value)) + width - 1, width))
+
+  defp rows_before(values, index, width) do
+    values |> Enum.take(index) |> Enum.reduce(0, fn v, acc -> acc + item_rows(v, width) end)
+  end
+
+  defp item_index_at_row(values, row, width) do
+    {_, idx} =
+      Enum.reduce_while(values, {0, 0}, fn v, {cur_row, idx} ->
+        next_row = cur_row + item_rows(v, width)
+        if next_row > row, do: {:halt, {cur_row, idx}}, else: {:cont, {next_row, idx + 1}}
+      end)
+
+    idx
   end
 
   defp normalize_selected_index(_index, []), do: nil

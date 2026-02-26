@@ -36,7 +36,8 @@ defmodule Breeze.ListViewTest do
         selected_index: 0,
         offset: 0,
         loop: true,
-        scroll_padding: 0
+        scroll_padding: 0,
+        width: 0
       }
 
       {{:change, payload}, state} =
@@ -57,7 +58,8 @@ defmodule Breeze.ListViewTest do
         selected_index: 2,
         offset: 0,
         loop: true,
-        scroll_padding: 0
+        scroll_padding: 0,
+        width: 0
       }
 
       {{:change, payload}, state} =
@@ -77,7 +79,8 @@ defmodule Breeze.ListViewTest do
         selected_index: 2,
         offset: 0,
         loop: false,
-        scroll_padding: 0
+        scroll_padding: 0,
+        width: 0
       }
 
       {{:change, _payload}, state} =

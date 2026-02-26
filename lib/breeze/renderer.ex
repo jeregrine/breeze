@@ -23,8 +23,15 @@ defmodule Breeze.Renderer do
 
   defp build_from_tree_nodes(children, opts) do
     {acc, box} =
-      build_tree(children, %BackBreeze.Box{}, [], "", [],
-                 %{focusables: [], id: 0, elements: %{}, ids: [], flags: []}, opts)
+      build_tree(
+        children,
+        %BackBreeze.Box{},
+        [],
+        "",
+        [],
+        %{focusables: [], id: 0, elements: %{}, ids: [], flags: []},
+        opts
+      )
 
     acc = %{acc | elements: Map.put(acc.elements, acc.id, acc.flags)}
     ids = Enum.reverse(acc.ids)
