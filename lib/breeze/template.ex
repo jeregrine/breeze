@@ -59,6 +59,134 @@ defmodule Breeze.Template do
     render_nodes(nodes, ctx)
   end
 
+  def render_to_tree(%__MODULE__{nodes: nodes, env: env}, assigns) do
+    ctx = %{assigns: normalize_assigns(assigns), vars: %{}, env: env}
+    nodes_to_tree(nodes, ctx)
+  end
+
+  defp nodes_to_tree(nodes, ctx) do
+    Enum.flat_map(nodes, &node_to_tree(&1, ctx))
+  end
+
+  defp node_to_tree({:text, segments}, ctx) do
+    {acc, trailing_text} =
+      Enum.reduce(segments, {[], ""}, fn
+        {:expr, expr}, {acc, text} ->
+          case render_slot_expr(expr, ctx) do
+            {:slot, nodes} ->
+              acc = if text == "", do: acc, else: acc ++ [text]
+              {acc ++ nodes, ""}
+
+            :not_a_slot ->
+              {acc, text <> normalize_output(eval_expr(expr, ctx))}
+          end
+
+        literal, {acc, text} when is_binary(literal) ->
+          {acc, text <> literal}
+      end)
+
+    if trailing_text == "", do: acc, else: acc ++ [trailing_text]
+  end
+
+  defp node_to_tree({:expr, expr}, ctx) do
+    case render_slot_expr(expr, ctx) do
+      {:slot, nodes} ->
+        nodes
+
+      :not_a_slot ->
+        case eval_expr(expr, ctx) do
+          nil -> []
+          "" -> []
+          other -> [normalize_output(other)]
+        end
+    end
+  end
+
+  defp node_to_tree({:element, name, attrs, directives, children}, ctx) do
+    expand_for(directives[:for], ctx)
+    |> Enum.flat_map(fn iteration_ctx ->
+      if render_if?(directives[:if], iteration_ctx) do
+        element_to_tree(name, attrs, children, iteration_ctx)
+      else
+        []
+      end
+    end)
+  end
+
+  defp render_slot_expr({:render_slot, _meta, [slot_arg]}, ctx) do
+    {:slot, expand_slot(eval_expr(slot_arg, ctx), %{}, ctx)}
+  end
+
+  defp render_slot_expr({:render_slot, _meta, [slot_arg, assigns_arg]}, ctx) do
+    {:slot, expand_slot(eval_expr(slot_arg, ctx), eval_expr(assigns_arg, ctx), ctx)}
+  end
+
+  defp render_slot_expr(_expr, _ctx), do: :not_a_slot
+
+  defp expand_slot(nil, _slot_assigns, _ctx), do: []
+
+  defp expand_slot(slots, slot_assigns, _ctx) when is_list(slots) do
+    slot_assigns = normalize_assigns(slot_assigns)
+
+    Enum.flat_map(slots, fn
+      %{__breeze_slot_raw__: {children, slot_ctx}} ->
+        nodes_to_tree(children, %{slot_ctx | vars: Map.merge(slot_ctx.vars, slot_assigns)})
+
+      _ ->
+        []
+    end)
+  end
+
+  defp expand_slot(%{__breeze_slot_raw__: {children, slot_ctx}}, slot_assigns, _ctx) do
+    slot_assigns = normalize_assigns(slot_assigns)
+    nodes_to_tree(children, %{slot_ctx | vars: Map.merge(slot_ctx.vars, slot_assigns)})
+  end
+
+  defp expand_slot(_slot, _slot_assigns, _ctx), do: []
+
+  defp element_to_tree("." <> component, attrs, children, ctx) do
+    module = ctx.env.module
+    fun = String.to_atom(component)
+
+    attrs = eval_component_attrs(attrs, ctx)
+    rest = Enum.filter(attrs, fn {key, _value} -> global_attr?(key) end)
+
+    assigns =
+      attrs
+      |> Map.new()
+      |> maybe_put_rest(rest)
+      |> Map.merge(build_slots(children, ctx))
+
+    %__MODULE__{nodes: comp_nodes, env: comp_env} = invoke_component(module, fun, assigns)
+    comp_ctx = %{assigns: assigns, vars: %{}, env: comp_env}
+    nodes_to_tree(comp_nodes, comp_ctx)
+  end
+
+  defp element_to_tree(":" <> _slot_name, _attrs, _children, _ctx), do: []
+
+  defp element_to_tree(name, attrs, children, ctx) do
+    attr_nodes =
+      attrs
+      |> eval_html_attrs(ctx)
+      |> Enum.map(fn
+        {attr_name, true} -> {:attribute_bool, [attr_name]}
+        {attr_name, value} -> {:attribute, [attr_name, to_string(value)]}
+      end)
+
+    child_nodes = nodes_to_tree(children, ctx) |> merge_text_nodes()
+
+    [{String.to_atom(name), [], attr_nodes ++ child_nodes}]
+  end
+
+  defp merge_text_nodes(nodes) do
+    nodes
+    |> Enum.reduce([], fn
+      text, [prev | rest] when is_binary(text) and is_binary(prev) -> [prev <> text | rest]
+      node, acc -> [node | acc]
+    end)
+    |> Enum.reverse()
+  end
+
   defp render_nodes(nodes, ctx) do
     Enum.map_join(nodes, "", &render_node(&1, ctx))
   end
@@ -164,7 +292,9 @@ defmodule Breeze.Template do
       render_nodes(children, slot_ctx)
     end
 
-    Map.put(slot_attrs, :__breeze_slot__, render_fun)
+    slot_attrs
+    |> Map.put(:__breeze_slot__, render_fun)
+    |> Map.put(:__breeze_slot_raw__, {children, ctx})
   end
 
   defp eval_html_attrs(attrs, ctx) do

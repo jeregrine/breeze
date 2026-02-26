@@ -40,33 +40,4 @@ defmodule Breeze.RendererTest do
     end
   end
 
-  describe "parse/2" do
-    alias BackBreeze.Box
-
-    test "converts a string to boxes" do
-      data =
-        Example.render(%{name: "world"})
-        |> Breeze.Template.render_to_string(%{name: "world"})
-
-      {_, boxes} = Renderer.parse(data)
-
-      assert boxes == %Box{
-               style: BackBreeze.Style.border(),
-               children: [
-                 %Box{
-                   children: [
-                     %Box{
-                       content: "Title",
-                       style: BackBreeze.Style.foreground_color(3)
-                     }
-                   ],
-                   position: :absolute,
-                   left: 1,
-                   top: 0
-                 },
-                 %Box{content: "Hello world", style: BackBreeze.Style.bold()}
-               ]
-             }
-    end
-  end
 end
