@@ -11,7 +11,7 @@ defmodule Breeze.RendererTest do
         <:title>
           <box style="text-3">Title</box>
         </:title>
-        <box style="bold">Hello <%= @name %></box>
+        <box style="bold">Hello {@name}</box>
       </.panel>
       """
     end
@@ -23,9 +23,35 @@ defmodule Breeze.RendererTest do
       ~H"""
       <box style="border">
         <box :if={assigns[:title]} style="absolute left-1 top-0">
-          <%= render_slot(@title) %>
+          {render_slot(@title)}
         </box>
-        <%= render_slot(@inner_block) %>
+        {render_slot(@inner_block)}
+      </box>
+      """
+    end
+  end
+
+  defmodule ScrollImplicit do
+    def init(_children, last_state), do: %{offset_y: last_state[:offset_y] || 0, offset_x: 0}
+
+    def handle_event(_, _, state), do: {:noreply, state}
+
+    def handle_modifiers(:root, _flags, state) do
+      [scroll_y: state.offset_y, scroll_x: 2]
+    end
+
+    def handle_modifiers(:child, _flags, _state), do: []
+  end
+
+  defmodule ScrollExample do
+    use Breeze.View
+
+    def render(assigns) do
+      ~H"""
+      <box id="list" implicit={ScrollImplicit} style="border width-6 height-2 overflow-hidden">
+        <box value="a">AAAAAA</box>
+        <box value="b">BBBBBB</box>
+        <box value="c">CCCCCC</box>
       </box>
       """
     end
@@ -69,6 +95,17 @@ defmodule Breeze.RendererTest do
                  %Box{content: "Hello world", style: BackBreeze.Style.bold()}
                ]
              }
+    end
+
+    test "applies implicit scroll modifiers as structured values" do
+      data =
+        Phoenix.HTML.Safe.to_iodata(ScrollExample.render(%{}))
+        |> IO.iodata_to_binary()
+
+      {_, box} =
+        Renderer.parse(data, implicit_state: %{"list" => {ScrollImplicit, %{offset_y: 1}}})
+
+      assert box.scroll == {1, 2}
     end
   end
 end

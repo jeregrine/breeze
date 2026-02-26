@@ -183,7 +183,7 @@ defmodule Breeze.Renderer do
 
     flags = if focused, do: Keyword.put(flags, :focused, focused), else: flags
 
-    style_opts =
+    style_flags =
       if focused do
         [focus: true]
       else
@@ -202,12 +202,12 @@ defmodule Breeze.Renderer do
 
     type = if id == Keyword.get(flags, :id), do: :root, else: :child
 
-    style_opts =
+    {style_flags, style_modifiers, scroll_modifier} =
       if implicit do
         modifiers = implicit_mod.handle_modifiers(type, flags, implicit)
-        style_opts ++ modifiers
+        parse_modifiers(modifiers, style_flags)
       else
-        style_opts
+        {style_flags, [], %{top: nil, left: nil}}
       end
 
     focusables =
@@ -215,12 +215,66 @@ defmodule Breeze.Renderer do
         do: [Keyword.get(flags, :id) | focusables],
         else: focusables
 
-    element = string_to_styles(style, style_opts)
-    opts = Map.put(element.attributes, :style, element.style)
+    element = string_to_styles(append_style_modifiers(style, style_modifiers), style_flags)
+
+    opts =
+      element.attributes
+      |> merge_scroll_modifier(scroll_modifier)
+      |> Map.put(:style, element.style)
+
     children = Enum.reverse(children)
     content = box.content
     acc = %{acc | focusables: focusables}
     {acc, %{Box.new(opts) | children: children, content: content}}
+  end
+
+  defp parse_modifiers(modifiers, style_flags) when is_list(modifiers) do
+    {style_flags, style_modifiers, scroll_modifier} =
+      Enum.reduce(modifiers, {style_flags, [], %{top: nil, left: nil}}, fn
+        {:style, value}, {flags, styles, scroll} when is_binary(value) ->
+          {flags, [value | styles], scroll}
+
+        {:scroll_y, top}, {flags, styles, scroll} when is_integer(top) ->
+          {flags, styles, %{scroll | top: top}}
+
+        {:scroll_x, left}, {flags, styles, scroll} when is_integer(left) ->
+          {flags, styles, %{scroll | left: left}}
+
+        {:scroll, {top, left}}, {flags, styles, _scroll}
+        when is_integer(top) and is_integer(left) ->
+          {flags, styles, %{top: top, left: left}}
+
+        {flag, value}, {flags, styles, scroll} when is_atom(flag) ->
+          {Keyword.put(flags, flag, value), styles, scroll}
+
+        _, acc ->
+          acc
+      end)
+
+    {style_flags, Enum.reverse(style_modifiers), scroll_modifier}
+  end
+
+  defp parse_modifiers(_modifiers, style_flags),
+    do: {style_flags, [], %{top: nil, left: nil}}
+
+  defp append_style_modifiers(style, []), do: style
+
+  defp append_style_modifiers(style, modifiers) do
+    [style | modifiers]
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.join(" ")
+  end
+
+  defp merge_scroll_modifier(attributes, %{top: nil, left: nil}), do: attributes
+
+  defp merge_scroll_modifier(attributes, %{top: top, left: left}) do
+    {existing_top, existing_left} = Map.get(attributes, :scroll, {0, 0})
+
+    top = if is_integer(top), do: max(top, 0), else: existing_top
+    left = if is_integer(left), do: max(left, 0), else: existing_left
+
+    Map.put(attributes, :scroll, {top, left})
   end
 
   defp string_to_styles(str, opts) do
@@ -273,7 +327,10 @@ defmodule Breeze.Renderer do
   defp apply_style("absolute", acc), do: Map.put(acc, :position, :absolute)
   defp apply_style("left-" <> num, acc), do: Map.put(acc, :left, String.to_integer(num))
   defp apply_style("top-" <> num, acc), do: Map.put(acc, :top, String.to_integer(num))
+  defp apply_style("width-auto", acc), do: Map.put(acc, :width, :auto)
+  defp apply_style("width-screen", acc), do: Map.put(acc, :width, :screen)
   defp apply_style("width-" <> num, acc), do: Map.put(acc, :width, String.to_integer(num))
+  defp apply_style("height-auto", acc), do: Map.put(acc, :height, :auto)
   defp apply_style("height-screen", acc), do: Map.put(acc, :height, :screen)
   defp apply_style("height-" <> num, acc), do: Map.put(acc, :height, String.to_integer(num))
 
