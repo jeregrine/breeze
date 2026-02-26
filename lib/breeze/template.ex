@@ -407,14 +407,14 @@ defmodule Breeze.Template do
 
   defp expand_for(nil, ctx), do: [ctx]
 
-  defp expand_for({pattern, enumerable_expr}, ctx) do
+  defp expand_for({_pattern_string, pattern_expr, enumerable_expr}, ctx) do
     enumerable = eval_expr(enumerable_expr, ctx)
 
     if is_nil(enumerable) do
       []
     else
       Enum.flat_map(enumerable, fn value ->
-        case bind_for_pattern(pattern, value, ctx) do
+        case bind_for_pattern(pattern_expr, value, ctx) do
           {:ok, vars} -> [%{ctx | vars: vars}]
           :error -> []
         end
@@ -422,21 +422,14 @@ defmodule Breeze.Template do
     end
   end
 
-  defp bind_for_pattern(pattern, value, ctx) do
+  defp bind_for_pattern(pattern_expr, value, ctx) do
     binding = Map.to_list(ctx.vars) ++ [assigns: ctx.assigns, breeze_value: value]
 
-    code = "case breeze_value do #{pattern} -> {:ok, binding()} ; _ -> :error end"
+    case Code.eval_quoted(pattern_expr, binding, ctx.env) do
+      {{:ok, new_vars}, _} ->
+        {:ok, Map.merge(ctx.vars, new_vars)}
 
-    case Code.eval_string(code, binding, ctx.env) do
-      {{:ok, bound}, _binding} ->
-        vars =
-          bound
-          |> Keyword.drop([:assigns, :breeze_value])
-          |> Map.new()
-
-        {:ok, vars}
-
-      {:error, _binding} ->
+      {:error, _} ->
         :error
     end
   end
@@ -605,7 +598,7 @@ defmodule Breeze.Template do
 
   defp build_attribute(":for", {:dynamic, expr}, env) do
     {pattern, enumerable} = split_for_expression(expr)
-    {:directive, :for, {pattern, compile_expr(enumerable, env)}}
+    {:directive, :for, {pattern, compile_for_pattern(pattern, env), compile_expr(enumerable, env)}}
   end
 
   defp build_attribute(":if", _other, _env) do
@@ -690,6 +683,46 @@ defmodule Breeze.Template do
         raise "invalid :for expression: #{inspect(expr)}"
     end
   end
+
+  defp compile_for_pattern(pattern_string, env) do
+    pattern_ast = Code.string_to_quoted!(pattern_string, file: env.file, line: env.line)
+    vars = collect_pattern_vars(pattern_ast)
+    result_map = {:%{}, [], Enum.map(vars, fn name -> {name, {name, [], nil}} end)}
+
+    {:case, [],
+     [
+       {:breeze_value, [], nil},
+       [
+         do: [
+           {:->, [], [[pattern_ast], {:ok, result_map}]},
+           {:->, [], [[{:_, [], nil}], :error]}
+         ]
+       ]
+     ]}
+  end
+
+  defp collect_pattern_vars(ast), do: do_collect_vars(ast, []) |> Enum.uniq()
+
+  defp do_collect_vars({:^, _, _}, acc), do: acc
+  defp do_collect_vars({:_, _, _}, acc), do: acc
+
+  defp do_collect_vars({name, _meta, ctx}, acc) when is_atom(name) and is_atom(ctx) do
+    [name | acc]
+  end
+
+  defp do_collect_vars({_form, _meta, args}, acc) when is_list(args) do
+    do_collect_vars(args, acc)
+  end
+
+  defp do_collect_vars({left, right}, acc) do
+    acc |> then(&do_collect_vars(left, &1)) |> then(&do_collect_vars(right, &1))
+  end
+
+  defp do_collect_vars(list, acc) when is_list(list) do
+    Enum.reduce(list, acc, &do_collect_vars/2)
+  end
+
+  defp do_collect_vars(_ast, acc), do: acc
 
   defp compile_expr(expr, env) do
     expr = String.trim(expr)

@@ -175,8 +175,8 @@ defmodule Breeze.HTMLFormatter do
 
   defp maybe_add_for(attrs, nil), do: attrs
 
-  defp maybe_add_for(attrs, {pattern, enumerable_expr}) do
-    attrs ++ [":for={" <> pattern <> " <- " <> expr_to_string(enumerable_expr) <> "}"]
+  defp maybe_add_for(attrs, {pattern_string, _pattern_expr, enumerable_expr}) do
+    attrs ++ [":for={" <> pattern_string <> " <- " <> expr_to_string(enumerable_expr) <> "}"]
   end
 
   defp maybe_add_if(attrs, nil), do: attrs
