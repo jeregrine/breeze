@@ -2,6 +2,7 @@ defmodule Breeze.Renderer do
   @moduledoc false
 
   alias BackBreeze.Box
+  alias BackBreeze.Style
 
   def render_to_string(mod, assigns, opts \\ []) do
     {_, %{content: content}} = render(mod, assigns, opts)
@@ -23,8 +24,15 @@ defmodule Breeze.Renderer do
 
   defp build_from_tree_nodes(children, opts) do
     {acc, box} =
-      build_tree(children, %BackBreeze.Box{}, [], "", [],
-                 %{focusables: [], id: 0, elements: %{}, ids: [], flags: []}, opts)
+      build_tree(
+        children,
+        %BackBreeze.Box{},
+        [],
+        "",
+        [],
+        %{focusables: [], id: 0, elements: %{}, ids: [], flags: []},
+        opts
+      )
 
     acc = %{acc | elements: Map.put(acc.elements, acc.id, acc.flags)}
     ids = Enum.reverse(acc.ids)
@@ -218,11 +226,11 @@ defmodule Breeze.Renderer do
         other -> str <> " " <> Enum.join(other, " ")
       end
 
-    map =
+    {bb_style, attributes} =
       String.split(str, " ")
       |> Enum.map(&String.split(&1, ":"))
       |> Enum.sort_by(&length/1)
-      |> Enum.reduce(%{}, fn style, acc ->
+      |> Enum.reduce({%Style{}, %{}}, fn style, acc ->
         style =
           Enum.reduce_while(style, nil, fn
             "focus", _ -> if Keyword.get(opts, :focus), do: {:cont, nil}, else: {:halt, nil}
@@ -233,45 +241,60 @@ defmodule Breeze.Renderer do
         apply_style(style, acc)
       end)
 
-    style_keys = Map.keys(Map.from_struct(%BackBreeze.Style{}))
-    {style, attributes} = Map.split(map, style_keys)
-    struct(Breeze.Element, %{style: style, attributes: attributes})
+    struct(Breeze.Element, %{style: Map.from_struct(bb_style), attributes: attributes})
   end
 
-  defp apply_style("border", acc), do: Map.put(acc, :border, :line)
-  defp apply_style("bold", acc), do: Map.put(acc, :bold, true)
-  defp apply_style("italic", acc), do: Map.put(acc, :italic, true)
-  defp apply_style("inverse", acc), do: Map.put(acc, :reverse, true)
-  defp apply_style("reverse", acc), do: Map.put(acc, :reverse, true)
-  defp apply_style("inline", acc), do: Map.put(acc, :display, :inline)
+  defp apply_style("border", {style, attrs}), do: {Style.border(style), attrs}
+  defp apply_style("bold", {style, attrs}), do: {Style.bold(style), attrs}
+  defp apply_style("italic", {style, attrs}), do: {Style.italic(style), attrs}
+  defp apply_style("inverse", {style, attrs}), do: {Style.reverse(style), attrs}
+  defp apply_style("reverse", {style, attrs}), do: {Style.reverse(style), attrs}
+  defp apply_style("inline", {style, attrs}), do: {style, Map.put(attrs, :display, :inline)}
 
-  defp apply_style("overflow-" <> overflow, acc),
-    do: Map.put(acc, :overflow, String.to_existing_atom(overflow))
+  defp apply_style("overflow-scroll", {style, attrs}),
+    do: {Style.overflow(style, :scroll), attrs}
 
-  defp apply_style("offset-top-" <> num, acc) do
-    {_, left} = Map.get(acc, :scroll, {0, 0})
-    Map.put(acc, :scroll, {String.to_integer(num), left})
+  defp apply_style("overflow-" <> overflow, {style, attrs}),
+    do: {Style.overflow(style, String.to_existing_atom(overflow)), attrs}
+
+  defp apply_style("offset-top-" <> num, {style, attrs}) do
+    {_, left} = Map.get(attrs, :scroll, {0, 0})
+    {style, Map.put(attrs, :scroll, {String.to_integer(num), left})}
   end
 
-  defp apply_style("offset-left-" <> num, acc) do
-    {top, _} = Map.get(acc, :scroll, {0, 0})
-    Map.put(acc, :scroll, {top, String.to_integer(num)})
+  defp apply_style("offset-left-" <> num, {style, attrs}) do
+    {top, _} = Map.get(attrs, :scroll, {0, 0})
+    {style, Map.put(attrs, :scroll, {top, String.to_integer(num)})}
   end
 
-  defp apply_style("absolute", acc), do: Map.put(acc, :position, :absolute)
-  defp apply_style("left-" <> num, acc), do: Map.put(acc, :left, String.to_integer(num))
-  defp apply_style("top-" <> num, acc), do: Map.put(acc, :top, String.to_integer(num))
-  defp apply_style("width-auto", acc), do: Map.put(acc, :width, :auto)
-  defp apply_style("width-screen", acc), do: Map.put(acc, :width, :screen)
-  defp apply_style("width-" <> num, acc), do: Map.put(acc, :width, String.to_integer(num))
-  defp apply_style("height-auto", acc), do: Map.put(acc, :height, :auto)
-  defp apply_style("height-screen", acc), do: Map.put(acc, :height, :screen)
-  defp apply_style("height-" <> num, acc), do: Map.put(acc, :height, String.to_integer(num))
+  defp apply_style("absolute", {style, attrs}), do: {style, Map.put(attrs, :position, :absolute)}
 
-  defp apply_style("text-" <> num, acc),
-    do: Map.put(acc, :foreground_color, String.to_integer(num))
+  defp apply_style("left-" <> num, {style, attrs}),
+    do: {style, Map.put(attrs, :left, String.to_integer(num))}
 
-  defp apply_style("bg-" <> num, acc), do: Map.put(acc, :background_color, String.to_integer(num))
-  defp apply_style("border-" <> num, acc), do: Map.put(acc, :border_color, String.to_integer(num))
+  defp apply_style("top-" <> num, {style, attrs}),
+    do: {style, Map.put(attrs, :top, String.to_integer(num))}
+
+  defp apply_style("width-auto", {style, attrs}), do: {Style.width(style, :auto), attrs}
+  defp apply_style("width-screen", {style, attrs}), do: {Style.width(style, :screen), attrs}
+
+  defp apply_style("width-" <> num, {style, attrs}),
+    do: {Style.width(style, String.to_integer(num)), attrs}
+
+  defp apply_style("height-auto", {style, attrs}), do: {Style.height(style, :auto), attrs}
+  defp apply_style("height-screen", {style, attrs}), do: {Style.height(style, :screen), attrs}
+
+  defp apply_style("height-" <> num, {style, attrs}),
+    do: {Style.height(style, String.to_integer(num)), attrs}
+
+  defp apply_style("text-" <> num, {style, attrs}),
+    do: {Style.foreground_color(style, String.to_integer(num)), attrs}
+
+  defp apply_style("bg-" <> num, {style, attrs}),
+    do: {Style.background_color(style, String.to_integer(num)), attrs}
+
+  defp apply_style("border-" <> num, {style, attrs}),
+    do: {Style.border_color(style, String.to_integer(num)), attrs}
+
   defp apply_style(_, acc), do: acc
 end

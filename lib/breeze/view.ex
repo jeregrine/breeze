@@ -51,7 +51,6 @@ defmodule Breeze.View do
   * `id` - the id of the element. This is required for focusables and implicits
   * `focusable` - if the element should be added to the focus tree. These are added in
   the order they appear, and can be toggled using tab/shift-tab. The `focus` style
-     alias BackBreeze.Style
   state can be used to style these. E.g. style="border focus:border-3"
   * `style` - the style for the box. This is covered in the [Style](`m:Breeze.View#module-style`) section.
   * `implicit` - this is a module that will be used for implicit state. This is covered
@@ -109,6 +108,9 @@ defmodule Breeze.View do
    * `inline` - display the elements inline (join horizontally)
    * `width-x` - set the width of the element
    * `height-x` - set the height of the element
+   * `overflow-hidden` - clip child content to the viewport
+   * `offset-top-x` - vertically scroll content by x rows
+   * `offset-left-x` - horizontally scroll content by x columns
    * `absolute` - position the elements absolute relative to the parent
    * `border-x` - set the border color where x is a number
    * `bg-x` - set the background color where x is a number
@@ -158,15 +160,15 @@ defmodule Breeze.View do
   end
     ```
 
-  The implicit module is first called with an `init/2` callback, which is called with all
-  the attributes of all the child elements, and the previous state. This ensures that
-  values persist between renders.
+  The implicit module is first called with an `init/2` callback (or optional `init/3`).
+  It receives all child element attributes and the previous state. The `init/3` form
+  also receives root attributes for the implicit container.
 
   ```
   defmodule MyAppList do
 
-    def init(children, last_state) do
-      %{values: Enum.map(children, &(&1.value)), selected: last_state[:selected]}
+    def init(children, root_attrs, last_state) do
+      %{values: Enum.map(children, &(&1.value)), selected: last_state[:selected], root: root_attrs}
     end
   end
   ```
@@ -193,18 +195,24 @@ defmodule Breeze.View do
   def handle_event(_, _, state), do: {:noreply, state}
   ```
 
-  There is one final handler which is called when a child is being rendered.
-  `handle_modifiers/2` can be used to tell the renderer things about the state.
-  In this case, we want to add the `:selected` flag so that the list element is
-  styled differently.
+  There is one final handler which is called when implicit elements are rendered.
+  `handle_modifiers/3` receives `:root` or `:child` as the first argument and can be
+  used to tell the renderer things about the state.
+
+  Return values can include style flags (for example `selected: true`) and structured
+  scroll modifiers (`scroll_y`, `scroll_x`, or `scroll: {top, left}`).
 
   ```
-  def handle_modifiers(attributes, state) do
+  def handle_modifiers(:child, attributes, state) do
     if state.selected == Keyword.get(attributes, :value) do
       [selected: true]
     else
       []
     end
+  end
+
+  def handle_modifiers(:root, _attributes, state) do
+    [scroll_y: state.offset]
   end
   ```
 

@@ -22,9 +22,7 @@ defmodule Breeze.RendererTest do
     defp panel(assigns) do
       ~H"""
       <box style="border">
-        <box :if={assigns[:title]} style="absolute left-1 top-0">
-          {render_slot(@title)}
-        </box>
+        <box :if={assigns[:title]} style="absolute left-1 top-0">{render_slot(@title)}</box>
         {render_slot(@inner_block)}
       </box>
       """
@@ -52,7 +50,6 @@ defmodule Breeze.RendererTest do
         <box value="a">AAAAAA</box>
         <box value="b">BBBBBB</box>
         <box value="c">CCCCCC</box>
-      >>>>>>> ee48c43 (feat(viewport): add structured scroll modifiers and viewport metrics)
       </box>
       """
     end
@@ -66,6 +63,17 @@ defmodule Breeze.RendererTest do
                │\e[1mHello world\e[0m│
                └───────────┘\
                """
+    end
+  end
+
+  describe "render/3" do
+    test "applies implicit scroll modifiers as structured values" do
+      {_, box} =
+        Renderer.render(ScrollExample, %{},
+          implicit_state: %{"list" => {ScrollImplicit, %{offset_y: 1}}}
+        )
+
+      assert box.scroll == {1, 2}
     end
   end
 end
