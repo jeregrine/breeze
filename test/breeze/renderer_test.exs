@@ -22,9 +22,7 @@ defmodule Breeze.RendererTest do
     defp panel(assigns) do
       ~H"""
       <box style="border">
-        <box :if={assigns[:title]} style="absolute left-1 top-0">
-          <%= render_slot(@title) %>
-        </box>
+        <box :if={assigns[:title]} style="absolute left-1 top-0"><%= render_slot(@title) %></box>
         <%= render_slot(@inner_block) %>
       </box>
       """
@@ -42,33 +40,4 @@ defmodule Breeze.RendererTest do
     end
   end
 
-  describe "parse/2" do
-    alias BackBreeze.Box
-
-    test "converts a string to boxes" do
-      data =
-        Phoenix.HTML.Safe.to_iodata(Example.render(%{name: "world"}))
-        |> IO.iodata_to_binary()
-
-      {_, boxes} = Renderer.parse(data)
-
-      assert boxes == %Box{
-               style: BackBreeze.Style.border(),
-               children: [
-                 %Box{
-                   children: [
-                     %Box{
-                       content: "Title",
-                       style: BackBreeze.Style.foreground_color(3)
-                     }
-                   ],
-                   position: :absolute,
-                   left: 1,
-                   top: 0
-                 },
-                 %Box{content: "Hello world", style: BackBreeze.Style.bold()}
-               ]
-             }
-    end
-  end
 end

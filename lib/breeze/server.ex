@@ -200,7 +200,8 @@ defmodule Breeze.Server do
     {acc, %{content: output}} =
       Breeze.Renderer.render(state.view, state.assigns,
         focused: state.focused,
-        implicit_state: state.implicit_state
+        implicit_state: state.implicit_state,
+        terminal: state.terminal
       )
 
     terminal =

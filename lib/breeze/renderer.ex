@@ -2,60 +2,6 @@ defmodule Breeze.Renderer do
   @moduledoc false
 
   alias BackBreeze.Box
-  import NimbleParsec
-
-  defparsecp(:parse_nodes, parsec(:node) |> eos())
-
-  tag = ascii_string([?a..?z, ?_, ?A..?Z], min: 1)
-  text = utf8_string([not: ?<], min: 1)
-
-  attribute =
-    ignore(string(" "))
-    |> ascii_string([?a..?z, ?-], min: 1)
-    |> ignore(string("="))
-    |> ignore(string(~s(")))
-    |> ascii_string([not: ?"], min: 1)
-    |> ignore(string(~s(")))
-    |> tag(:attribute)
-
-  boolean_attribute =
-    ignore(string(" "))
-    |> ascii_string([?a..?z], min: 1)
-    |> tag(:attribute_bool)
-
-  opening_tag =
-    ignore(string("<"))
-    |> concat(tag)
-    |> repeat(
-      choice([
-        attribute,
-        boolean_attribute
-      ])
-    )
-    |> ignore(string(">"))
-
-  closing_tag = ignore(string("</")) |> concat(tag) |> ignore(string(">"))
-
-  padding = string("\n") |> repeat(choice([ascii_char([?\s]), string("\n")]))
-
-  defcombinatorp(
-    :node,
-    opening_tag
-    |> ignore(optional(padding))
-    |> repeat(lookahead_not(string("</")) |> choice([parsec(:node), text]))
-    |> wrap()
-    |> concat(closing_tag)
-    |> ignore(optional(padding))
-    |> post_traverse(:match_and_emit_tag)
-  )
-
-  defp match_and_emit_tag(rest, [tag, [tag, text]], context, _line, _offset) do
-    {rest, [{String.to_atom(tag), [], [text]}], context}
-  end
-
-  defp match_and_emit_tag(rest, [tag, [tag | nodes]], context, _line, _offset) do
-    {rest, [{String.to_atom(tag), [], nodes}], context}
-  end
 
   def render_to_string(mod, assigns, opts \\ []) do
     {_, %{content: content}} = render(mod, assigns, opts)
@@ -63,35 +9,33 @@ defmodule Breeze.Renderer do
   end
 
   def render(mod, assigns, opts \\ []) do
-    {acc, box} =
-      Phoenix.HTML.Safe.to_iodata(mod.render(assigns))
-      |> IO.iodata_to_binary()
-      |> parse(opts)
+    [{_tag, _, root_children}] =
+      mod.render(assigns)
+      |> Breeze.Template.render_to_tree(assigns)
 
-    {acc, BackBreeze.Box.render(box)}
+    {acc, box} = build_from_tree_nodes(root_children, opts)
+    {acc, BackBreeze.Box.render(box, terminal: terminal_from_opts(opts))}
   end
 
-  def parse(data, opts \\ []) do
-    {:ok, [{:box, _, children}], "", _, _, _} = parse_nodes(data)
-
+  defp build_from_tree_nodes(children, opts) do
     {acc, box} =
-      build_tree(
-        children,
-        %BackBreeze.Box{},
-        [],
-        "",
-        [],
-        %{focusables: [], id: 0, elements: %{}, ids: [], flags: []},
-        opts
-      )
+      build_tree(children, %BackBreeze.Box{}, [], "", [],
+                 %{focusables: [], id: 0, elements: %{}, ids: [], flags: []}, opts)
 
     acc = %{acc | elements: Map.put(acc.elements, acc.id, acc.flags)}
-
     ids = Enum.reverse(acc.ids)
-    focusables = Enum.reverse(acc.focusables)
-    focusables = Enum.filter(ids, fn id -> id in focusables end)
-
+    focusables = Enum.reverse(acc.focusables) |> then(&Enum.filter(ids, fn id -> id in &1 end))
     {%{acc | ids: ids, focusables: focusables}, box}
+  end
+
+  defp terminal_from_opts(opts) do
+    case Keyword.get(opts, :terminal) do
+      %Termite.Terminal{} = terminal ->
+        terminal
+
+      _ ->
+        %Termite.Terminal{size: %{width: 80, height: 24}}
+    end
   end
 
   defp build_tree(
@@ -148,7 +92,6 @@ defmodule Breeze.Renderer do
 
   defp build_tree([content | rest], box, children, style, flags, acc, opts)
        when is_binary(content) do
-    # TODO: move the String.trim_trailing into the parser
     box = %{box | content: String.trim_trailing(content, "\n  ")}
     build_tree(rest, box, children, style, flags, acc, opts)
   end
