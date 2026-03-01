@@ -11,6 +11,8 @@ defmodule Docs do
         docs: docs,
         functions: nil,
         selected: nil,
+        fun_selected: nil,
+        fun_doc: nil,
         mod_total: length(docs),
         mod_index: 0,
         mod_offset: 0,
@@ -18,7 +20,8 @@ defmodule Docs do
         fun_total: 0,
         fun_index: 0,
         mod_width: 32,
-        fun_width: 32
+        fun_width: 32,
+        doc_width: 48
       )
 
     {:ok, term}
@@ -48,6 +51,7 @@ defmodule Docs do
       >
         <:item :for={function <- @functions} value={function}><%= function %></:item>
       </.list>
+      <.markdown :if={@fun_doc} id="doc" width={@doc_width} content={@fun_doc} />
     </box>
     """
   end
@@ -67,7 +71,7 @@ defmodule Docs do
     ~H"""
     <box
       focusable
-      style={"border height-screen overflow-scroll width-#{@width} focus:border-3"}
+      style={"border height-screen overflow-scroll width-#{@width} focus:border-3 focus:scrollbar-3"}
       implicit={Breeze.ListView}
       id={@id}
       list-width={@width}
@@ -89,6 +93,21 @@ defmodule Docs do
         <%= render_slot(item, %{}) %>
       </box>
     </box>
+    """
+  end
+
+  attr(:id, :string, required: true)
+  attr(:content, :string, required: true)
+  attr(:width, :integer, required: true)
+
+  def markdown(assigns) do
+    ~H"""
+    <box
+      focusable
+      id={@id}
+      implicit={Breeze.ScrollView}
+      style={"border height-screen overflow-scroll width-#{@width} focus:border-3 focus:scrollbar-3"}
+    ><%= Breeze.Markdown.render(@content, @width - 2) %></box>
     """
   end
 
@@ -116,13 +135,15 @@ defmodule Docs do
               end
             end)
 
-          assign(term,
+          term
+          |> assign(
             functions: Enum.reverse(funs),
             selected: value,
             fun_total: length(funs),
             mod_index: index,
             mod_offset: offset
           )
+          |> update_in([Access.key(:implicit_state)], &Map.delete(&1, "doc"))
 
         _ ->
           term
@@ -131,8 +152,10 @@ defmodule Docs do
     {:noreply, term}
   end
 
-  def handle_event("function", %{index: index, offset: offset}, term) do
-    term = assign(term, fun_index: index, fun_offset: offset)
+  def handle_event("function", %{value: value, index: index, offset: offset}, term) do
+    doc = fetch_function_doc(term.assigns.selected, value)
+    term = assign(term, fun_index: index, fun_offset: offset, fun_selected: value, fun_doc: doc)
+    term = update_in(term.implicit_state, &Map.delete(&1, "doc"))
     {:noreply, term}
   end
 
@@ -159,7 +182,45 @@ defmodule Docs do
   end
 
   def handle_event(_, _, term), do: {:noreply, term}
+
+  defp fetch_function_doc(module_str, function_str) do
+    module =
+      case module_str do
+        ":" <> mod -> String.to_existing_atom(mod)
+        _ -> String.to_existing_atom("Elixir." <> module_str)
+      end
+
+    [fun_name, arity_str] = String.split(function_str, "/")
+    fun_name = String.to_atom(fun_name)
+    arity = String.to_integer(arity_str)
+
+    case Code.fetch_docs(module) do
+      {:docs_v1, _, _, _, _, _, docs} ->
+        Enum.find_value(docs, fn
+          {{:function, ^fun_name, ^arity}, _, signature, doc_map, _} ->
+            heading =
+              case signature do
+                [] -> "#{fun_name}/#{arity}"
+                sigs -> Enum.join(sigs, "\n")
+              end
+
+            doc_text = case doc_map do
+              %{"en" => text} -> text
+              _ -> ""
+            end
+
+            "## #{heading}\n\n" <> doc_text
+
+          _ ->
+            nil
+        end) || ""
+
+      _ ->
+        ""
+    end
+  end
+
 end
 
-Breeze.Server.start_link(view: Docs)
+Breeze.Server.start_link(view: Docs, hide_cursor: true)
 :timer.sleep(100_000)
