@@ -40,8 +40,8 @@ defmodule Breeze.TemplateTest do
   defmodule ComponentView do
     use Breeze.View
 
-    attr(:rest, :global)
-    slot(:inner_block)
+    attr :rest, :global
+    slot :inner_block
 
     def wrapper(assigns) do
       ~H|<box class="wrapper" {@rest}>{render_slot(@inner_block)}</box>|
@@ -58,7 +58,7 @@ defmodule Breeze.TemplateTest do
     use Breeze.View
 
     slot :item do
-      attr(:label, :string)
+      attr :label, :string
     end
 
     def list(assigns) do

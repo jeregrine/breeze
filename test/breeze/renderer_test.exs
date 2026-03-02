@@ -16,8 +16,8 @@ defmodule Breeze.RendererTest do
       """
     end
 
-    slot(:title)
-    slot(:inner_block)
+    slot :title
+    slot :inner_block
 
     defp panel(assigns) do
       ~H"""

@@ -28,18 +28,16 @@ defmodule Snake do
     """
   end
 
-  attr(:width, :integer)
-  attr(:height, :integer)
+  attr :width, :integer
+  attr :height, :integer
 
-  slot(:title)
-  slot(:inner_block)
+  slot :title
+  slot :inner_block
 
   def panel(assigns) do
     ~H"""
     <box style={"border width-#{@width} height-#{@height}"}>
-      <box :if={assigns[:title]} style="absolute left-1 top-0">
-        {render_slot(@title)}
-      </box>
+      <box :if={assigns[:title]} style="absolute left-1 top-0">{render_slot(@title)}</box>
       {render_slot(@inner_block)}
     </box>
     """

@@ -70,11 +70,11 @@ defmodule Focus do
     """
   end
 
-  attr(:id, :string, required: true)
-  attr(:rest, :global)
+  attr :id, :string, required: true
+  attr :rest, :global
 
   slot :item do
-    attr(:value, :string, required: true)
+    attr :value, :string, required: true
   end
 
   def list(assigns) do
