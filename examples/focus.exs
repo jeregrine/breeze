@@ -11,7 +11,7 @@ updated_config =
 
 defmodule Breeze.List do
   def init(children, last_state) do
-    %{values: Enum.map(children, &(&1.value)), selected: last_state[:selected]}
+    %{values: Enum.map(children, & &1.value), selected: last_state[:selected]}
   end
 
   def handle_event(_, %{"key" => "ArrowDown"}, %{values: values} = state) do
@@ -29,7 +29,7 @@ defmodule Breeze.List do
 
   def handle_event(_, _, state), do: {:noreply, state}
 
-  def handle_modifiers(flags, state) do
+  def handle_modifiers(_, flags, state) do
     if state.selected == Keyword.get(flags, :value) do
       [selected: true]
     else
@@ -57,7 +57,6 @@ defmodule Focus do
           <:item value="foo">Foo</:item>
         </.list>
       </box>
-
       <box style="inline border focus:border-3" focusable id="basel">
         <.list :for={id <- ["ll1", "ll2", "ll3", "ll4", "ll5"]} id={id}>
           <:item value="hello">Hello</:item>
@@ -81,11 +80,13 @@ defmodule Focus do
   def list(assigns) do
     ~H"""
     <box focusable style="border focus:border-3" implicit={Breeze.List} id={@id} {@rest}>
-        <box
-          :for={item <- @item}
-          value={item.value}
-          style="selected:bg-24 selected:text-0 focus:selected:text-7 focus:selected:bg-4"
-        >{render_slot(item, %{})}</box>
+      <box
+        :for={item <- @item}
+        value={item.value}
+        style="selected:bg-24 selected:text-0 focus:selected:text-7 focus:selected:bg-4"
+      >
+        {render_slot(item, %{})}
+      </box>
     </box>
     """
   end
@@ -102,7 +103,6 @@ defmodule Focus do
     {:noreply, term}
   end
 end
-
 
 Breeze.Server.start_link(view: Focus, hide_cursor: false)
 :timer.sleep(100_000)
