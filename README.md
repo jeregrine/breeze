@@ -1,46 +1,49 @@
 # Breeze
 
-An experimental TUI library with a LiveView-inspired API without using 3rd party NIFs.
+An experimental TUI library with a LiveView-inspired API without using 3rd party
+NIFs.
 
-Breeze is built on top of [Termite](https://github.com/Gazler/termite) and [BackBreeze](https://github.com/Gazler/back_breeze)
+Breeze is built on top of [Termite](https://github.com/Gazler/termite) and
+[BackBreeze](https://github.com/Gazler/back_breeze)
 
 ## Should I use this?
 
-**This library is highly experimental and incomplete. It provides an example of how a TUI
-based on LiveView could work.**
+**This library is highly experimental and incomplete. It provides an example of
+how a TUI based on LiveView could work.**
 
 I mainly built it for writing snake, which is in the examples directory.
 
 ## Features:
 
- * LiveView style API
-  * mount/2
-  * handle_event/3
-  * components
-  * attributes
-  * slots
+- LiveView style API
+- mount/2
+- handle_event/3
+- components
+- attributes
+- slots
+- Scrollable viewports via implicit modifiers (`scroll_y`, `scroll_x`, `scroll`)
 
 ## Missing features
 
- * behaviours for all of the modules that expect callbacks
- * Whitespace is a bit janky in the template engine
- * A decent way to handle logging
- * A decent way to handle errors/exceptions
- * viewports/sizing calculations allowing for scrollable regions
-  * this requires modifications to how BackBreeze renders boxes
- * A component library
- * handle colour variants
+- behaviours for all of the modules that expect callbacks
+- Whitespace is a bit janky in the template engine
+- A decent way to handle logging
+- A decent way to handle errors/exceptions
+- scrollbars for viewport/list components
+- A component library
+- handle colour variants
 
 ## Does this actually use LiveView?
 
 No. Breeze now ships with its own `~H` sigil and template runtime.
 
-The syntax is intentionally similar to HEEx (`@assigns`, function components, slots,
-`:for`, `:if`), but it does not depend on `phoenix_live_view`.
+The syntax is intentionally similar to HEEx (`@assigns`, function components,
+slots, `:for`, `:if`), but it does not depend on `phoenix_live_view`.
 
 ## Installation
 
-Breeze can be installed by adding `breeze` to your list of dependencies in `mix.exs`:
+Breeze can be installed by adding `breeze` to your list of dependencies in
+`mix.exs`:
 
 ```elixir
 def deps do
