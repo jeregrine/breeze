@@ -21,12 +21,12 @@ I mainly built it for writing snake, which is in the examples directory.
   * slots
  * Scrollable viewports via implicit modifiers (`scroll_y`, `scroll_x`, `scroll`)
  * Built-in `Breeze.ListView` implicit for keyboard-driven list navigation
+ * Built-in `Breeze.LogView` implicit for realtime log viewers (scroll + selection)
 
 ## Missing features
 
  * behaviours for all of the modules that expect callbacks
  * Whitespace is a bit janky in the template engine
- * A decent way to handle logging
  * A decent way to handle errors/exceptions
  * scrollbars for viewport/list components
  * A component library
@@ -109,5 +109,33 @@ For focusable, keyboard-driven lists with viewport scrolling, use `Breeze.ListVi
 
 `Breeze.ListView` emits `{value, index, offset}` through `br-change` and applies
 `selected: true` to the active child.
+
+## Built-in LogView implicit
+
+For realtime log rendering with keyboard scrolling and selection:
+
+```elixir
+<box
+  id="logs"
+  implicit={Breeze.LogView}
+  br-change="log-change"
+  focusable
+  style="border width-screen height-18 overflow-scroll"
+>
+  <box
+    :for={entry <- @logs}
+    log-id={entry.id}
+    level={entry.level}
+    message={entry.message}
+    style="width-screen"
+  >
+    <%= Breeze.LogView.format_entry(entry) %>
+  </box>
+</box>
+```
+
+`Breeze.LogView` supports scrolling keys (`ArrowUp/Down`, `PageUp/PageDown`,
+`Home`, `End`), `f` follow toggle, and emits selection/offset updates through
+`br-change`.
 
 More examples are available in the examples directory.

@@ -10,7 +10,8 @@ defmodule Breeze.Term do
     focusables: [],
     elements: %{},
     events: %{},
-    implicit_state: %{}
+    implicit_state: %{},
+    input_buffer: ""
   ]
 end
 
@@ -114,7 +115,7 @@ defmodule Breeze.Server do
         hd(state.focusables)
       end
 
-    state = %{state | focused: new_focused}
+    state = %{state | focused: new_focused, input_buffer: ""}
     state = render(state)
 
     {:noreply, state}
@@ -130,52 +131,19 @@ defmodule Breeze.Server do
         true -> Enum.at(state.focusables, index - 1)
       end
 
-    state = %{state | focused: new_focused}
+    state = %{state | focused: new_focused, input_buffer: ""}
     state = render(state)
     {:noreply, state}
   end
 
-  def handle_info({reader, {:data, key}}, %{reader: reader} = state) do
-    key =
-      if String.starts_with?(key, Termite.Screen.escape_code()) do
-        convert_key(String.trim_leading(key, Termite.Screen.escape_code()))
-      else
-        key
-      end
+  def handle_info({reader, {:data, raw_key}}, %{reader: reader} = state) do
+    {decoded_key, input_buffer} = decode_input(raw_key, state.input_buffer)
+    state = %{state | input_buffer: input_buffer}
 
-    selected_implicit = Enum.find(state.implicit_state, fn {id, _el} -> id == state.focused end)
-
-    {view_state, state} =
-      if selected_implicit do
-        {id, {mod, selected}} = selected_implicit
-
-        element = Map.get(state.elements, id)
-
-        {event, val} =
-          case mod.handle_event(:ignore_me, %{"key" => key, "element" => element}, selected) do
-            {{:change, event}, val} -> {event, val}
-            {:noreply, val} -> {nil, val}
-          end
-
-        change = get_in(state.events, [id, :change])
-
-        {view_state, state} =
-          if event && change do
-            handle_event(change, event, state)
-          else
-            {:noreply, state}
-          end
-
-        implicit_state = Map.put(state.implicit_state, id, {mod, val})
-        {view_state, %{state | implicit_state: implicit_state}}
-      else
-        {:noreply, state}
-      end
-
-    case view_state == :stop || handle_event(:ignore_me, %{"key" => key}, state) do
-      true -> stop(state)
-      {:stop, state} -> stop(state)
-      {:noreply, state} -> {:noreply, render(state)}
+    if decoded_key do
+      dispatch_key(decoded_key, state)
+    else
+      {:noreply, state}
     end
   end
 
@@ -295,10 +263,91 @@ defmodule Breeze.Server do
     }
   end
 
+  defp dispatch_key(key, state) do
+    selected_implicit = Enum.find(state.implicit_state, fn {id, _el} -> id == state.focused end)
+
+    {view_state, state} =
+      if selected_implicit do
+        {id, {mod, selected}} = selected_implicit
+
+        element = Map.get(state.elements, id)
+
+        {event, val} =
+          case mod.handle_event(:ignore_me, %{"key" => key, "element" => element}, selected) do
+            {{:change, event}, val} -> {event, val}
+            {:noreply, val} -> {nil, val}
+          end
+
+        change = get_in(state.events, [id, :change])
+
+        {view_state, state} =
+          if event && change do
+            handle_event(change, event, state)
+          else
+            {:noreply, state}
+          end
+
+        implicit_state = Map.put(state.implicit_state, id, {mod, val})
+        {view_state, %{state | implicit_state: implicit_state}}
+      else
+        {:noreply, state}
+      end
+
+    case view_state == :stop || handle_event(:ignore_me, %{"key" => key}, state) do
+      true -> stop(state)
+      {:stop, state} -> stop(state)
+      {:noreply, state} -> {:noreply, render(state)}
+    end
+  end
+
+  defp decode_input(raw_key, input_buffer) do
+    data = (input_buffer || "") <> raw_key
+
+    cond do
+      data == "" ->
+        {nil, ""}
+
+      String.starts_with?(data, Termite.Screen.escape_code()) ->
+        sequence = String.trim_leading(data, Termite.Screen.escape_code())
+
+        cond do
+          escape_sequence_complete?(sequence) ->
+            {convert_key(sequence), ""}
+
+          escape_sequence_prefix?(sequence) ->
+            {nil, data}
+
+          true ->
+            {sequence, ""}
+        end
+
+      true ->
+        {data, ""}
+    end
+  end
+
+  defp escape_sequence_complete?(sequence) when is_binary(sequence) do
+    sequence != "" and
+      Regex.match?(~r/^[0-9;<>?]*[A-Za-z~]$/, sequence)
+  end
+
+  defp escape_sequence_prefix?(sequence) when is_binary(sequence) do
+    sequence == "" or Regex.match?(~r/^[0-9;<>?]*$/, sequence)
+  end
+
   defp convert_key("A"), do: "ArrowUp"
   defp convert_key("B"), do: "ArrowDown"
   defp convert_key("C"), do: "ArrowRight"
   defp convert_key("D"), do: "ArrowLeft"
+  defp convert_key("5~"), do: "PageUp"
+  defp convert_key("6~"), do: "PageDown"
+  defp convert_key("H"), do: "Home"
+  defp convert_key("F"), do: "End"
+  defp convert_key("1~"), do: "Home"
+  defp convert_key("4~"), do: "End"
+  defp convert_key("7~"), do: "Home"
+  defp convert_key("8~"), do: "End"
+  defp convert_key(sequence), do: sequence
 
   defp handle_event(change, event, state) do
     state.view.handle_event(change, event, state)
