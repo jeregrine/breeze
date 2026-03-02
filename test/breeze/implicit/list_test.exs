@@ -1,14 +1,14 @@
-defmodule Breeze.ListViewTest do
+defmodule Breeze.Implicit.ListTest do
   use ExUnit.Case, async: true
 
-  alias Breeze.ListView
+  alias Breeze.Implicit
   alias Breeze.Viewport
 
   describe "init/3" do
     test "keeps prior selection when still present" do
       children = [%{value: "one"}, %{value: "two"}, %{value: "three"}]
 
-      state = ListView.init(children, %{}, %{selected: "two", offset: 2})
+      state = Implicit.List.init(children, %{}, %{selected: "two", offset: 2})
 
       assert state.selected == "two"
       assert state.selected_index == 1
@@ -19,7 +19,7 @@ defmodule Breeze.ListViewTest do
       children = [%{value: "a"}, %{value: "b"}, %{value: "c"}]
 
       state =
-        ListView.init(children, %{:"list-loop" => false, :"list-scroll-padding" => "2"}, %{})
+        Implicit.List.init(children, %{:"list-loop" => false, :"list-scroll-padding" => "2"}, %{})
 
       assert state.loop == false
       assert state.scroll_padding == 2
@@ -41,7 +41,7 @@ defmodule Breeze.ListViewTest do
       }
 
       {{:change, payload}, state} =
-        ListView.handle_event(:ignore, %{"key" => "ArrowDown", "element" => viewport}, state)
+        Implicit.List.handle_event(:ignore, %{"key" => "ArrowDown", "element" => viewport}, state)
 
       assert state.selected_index == 1
       assert state.selected == "item-2"
@@ -63,7 +63,7 @@ defmodule Breeze.ListViewTest do
       }
 
       {{:change, payload}, state} =
-        ListView.handle_event(:ignore, %{"key" => "ArrowDown", "element" => viewport}, state)
+        Implicit.List.handle_event(:ignore, %{"key" => "ArrowDown", "element" => viewport}, state)
 
       assert state.selected == "a"
       assert state.selected_index == 0
@@ -84,7 +84,7 @@ defmodule Breeze.ListViewTest do
       }
 
       {{:change, _payload}, state} =
-        ListView.handle_event(:ignore, %{"key" => "ArrowDown", "element" => viewport}, state)
+        Implicit.List.handle_event(:ignore, %{"key" => "ArrowDown", "element" => viewport}, state)
 
       assert state.selected == "c"
       assert state.selected_index == 2
@@ -95,9 +95,9 @@ defmodule Breeze.ListViewTest do
     test "marks selected children" do
       state = %{selected: "value", offset: 2}
 
-      assert ListView.handle_modifiers(:child, [value: "value"], state) == [selected: true]
-      assert ListView.handle_modifiers(:child, [value: "other"], state) == []
-      assert ListView.handle_modifiers(:root, [], state) == [scroll_y: 2]
+      assert Implicit.List.handle_modifiers(:child, [value: "value"], state) == [selected: true]
+      assert Implicit.List.handle_modifiers(:child, [value: "other"], state) == []
+      assert Implicit.List.handle_modifiers(:root, [], state) == [scroll_y: 2]
     end
   end
 end

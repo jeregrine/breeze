@@ -1,5 +1,6 @@
-defmodule Breeze.ListView do
-  @moduledoc """
+defmodule Breeze.Implicit.List do
+  @moduledoc false
+  _ = """
   Built-in implicit module for keyboard-navigable list views.
 
   ## Root options
@@ -146,7 +147,10 @@ defmodule Breeze.ListView do
       if index do
         first = rows_before(state.values, index, state.width)
         last = first + item_rows(Enum.at(state.values, index), state.width) - 1
-        Viewport.ensure_range_visible(state.offset, first, last, viewport, padding: state.scroll_padding)
+
+        Viewport.ensure_range_visible(state.offset, first, last, viewport,
+          padding: state.scroll_padding
+        )
       else
         Viewport.clamp_scroll_y(state.offset, viewport)
       end
@@ -200,7 +204,9 @@ defmodule Breeze.ListView do
   end
 
   defp item_rows(_value, 0), do: 1
-  defp item_rows(value, width), do: max(1, div(String.length(to_string(value)) + width - 1, width))
+
+  defp item_rows(value, width),
+    do: max(1, div(String.length(to_string(value)) + width - 1, width))
 
   defp rows_before(values, index, width) do
     values |> Enum.take(index) |> Enum.reduce(0, fn v, acc -> acc + item_rows(v, width) end)

@@ -1,38 +1,9 @@
-defmodule DemoViewport do
-  def init(_children, last_state) do
-    %{offset: last_state[:offset] || 0}
-  end
-
-  def handle_event(_, %{"key" => "ArrowDown", "element" => element}, %{offset: offset} = state) do
-    offset = Breeze.Viewport.clamp_scroll_y(offset + 1, element)
-    {:noreply, %{state | offset: offset}}
-  end
-
-  def handle_event(_, %{"key" => "ArrowUp", "element" => element}, %{offset: offset} = state) do
-    offset = Breeze.Viewport.clamp_scroll_y(offset - 1, element)
-    {:noreply, %{state | offset: offset}}
-  end
-
-  def handle_event(_, _, state) do
-    {:noreply, state}
-  end
-
-  def handle_modifiers(:root, _flags, state) do
-    [scroll_y: state.offset]
-  end
-
-  def handle_modifiers(:child, _flags, _state), do: []
-end
-
-
 defmodule Scroll do
   use Breeze.View
 
   def mount(_opts, term) do
     {:ok, focus(term, "content-1")}
   end
-
-  # TODO: add implicit here
 
   def render(assigns) do
     ~H"""
@@ -52,7 +23,7 @@ defmodule Scroll do
 
   def viewport(assigns) do
     ~H"""
-    <box style={"width-15 height-#{6 + @id} overflow-hidden border focus:border-3"} id={"content-#{@id}"} implicit={DemoViewport} focusable><%= render_slot(@inner_block) %></box>
+    <box style={"width-15 height-#{6 + @id} overflow-scroll border focus:border-3"} id={"content-#{@id}"} implicit={Breeze.Implicit.Scroll} focusable><%= render_slot(@inner_block) %></box>
     """
   end
 

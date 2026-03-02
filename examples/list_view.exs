@@ -35,7 +35,7 @@ defmodule ListViewDemo do
     ~H"""
     <box
       id={@id}
-      implicit={Breeze.ListView}
+      implicit={Breeze.Implicit.List}
       list-loop="true"
       list-scroll-padding="1"
       focusable
@@ -53,8 +53,9 @@ defmodule ListViewDemo do
     {:noreply, assign(term, selected: value)}
   end
 
-  def handle_info(_, term), do: {:noreply, term}
   def handle_event(_, _, term), do: {:noreply, term}
+
+  def handle_info(_, term), do: {:noreply, term}
 end
 
 Breeze.Server.start_link(view: ListViewDemo)

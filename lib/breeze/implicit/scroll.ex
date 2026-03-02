@@ -1,5 +1,7 @@
-defmodule Breeze.ScrollView do
-  @moduledoc """
+defmodule Breeze.Implicit.Scroll do
+  @moduledoc false
+
+  _ = """
   Built-in implicit module for keyboard-scrollable content areas.
 
   Supports Up/Down/PageUp/PageDown/Home/End for vertical scrolling.
